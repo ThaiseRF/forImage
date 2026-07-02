@@ -1,10 +1,10 @@
-#' Volumetric calculus of organisms
+#' Volumetric calculation
 #'
-#' @description The function calculates organisms volume based on geometric approximation.
+#' @description The function calculates foraminifera test volume or cell volume of similar organisms based on geometric approximation.
 #'
 #'
 #' @param data data frame containing size data. Size data parameters may vary according to chosen model, see Details.
-#' @param model character informing geometric model to calculate volume, the models options are listed below:
+#' @param model geometric model to calculate volume, the models options are listed below:
 #' \itemize{
 #'   \item \code{'1hl'} : sphere
 #'   \item \code{'2sl'} : half-sphere
@@ -24,7 +24,7 @@
 #'
 #' }
 #' @param ... other parameters.
-#' @details These geometric models applied in this function are based and adapted from microalgae models developed by Hillebrand et al. (1999) - \code{('.hl')}, Sun and Liu (2003) - \code{('.sl')} and Vadrucci, Cabrini and Basset (2007) - \code{('.v')}, plus other adapted models \code{('.fs')}.
+#' @details These geometric models applied in this function are based and adapted from microalgae models developed by Hillebrand et al. (1999) - \code{('.hl')}, Sun and Liu (2003) - \code{('.sl')} and Vadrucci, Cabrini and Basset (2007) - \code{('.v')}, plus other adapted models to benthic foraminifera \code{('.fs')}.
 #' The models can be a variable in \code{data} if specified as \code{model}.The size data parameters should follow the specified measures determined by each model, where \eqn{d_one} is minor diameter, \eqn{d_two} is major diameter and \eqn{h} is height.
 #' \tabular{ll}{
 #'   \code{'1hl'}
@@ -74,13 +74,15 @@
 #'
 #' }
 #'
-#' @return A `data.frame` or numeric object, consisting of calculated individual volume along with biovolume if the \code{pco} is informed.
-#' @author Thaise R. Freitas \email{thaisericardo.freitas@@gmail.com}
+#' @return A `data.frame` or numeric object, consisting of calculated individual total volume.
+#' @author Thaise Ricardo de Freitas \email{thaisericardo.freitas@@gmail.com}
 #' @references
 #' \itemize{
 #'   \item Hillebrand, H., Dürselen, C.D., Kirschtel, D., Pollingher, U., & Zohary, T. (1999). Biovolume calculation for pelagic and benthic microalgae. \emph{Journal of Phycology}, 35(2), 403–424. \emph{doi:10.1046/j.1529-8817.1999.3520403.x}
 #'   \item Sun, J., & Liu, D. (2003). Geometric models for calculating cell biovolume and surface area for phytoplankton. \emph{Journal of Plankton Research}, 25(11), 1331–1346. \emph{doi:10.1093/plankt/fbg096}
 #'   \item Vadrucci, M. R., Cabrini, M., & Basset, A. (2007). Biovolume determination of phytoplankton guilds in transitional water ecosystems of Mediterranean Ecoregion. \emph{Transitional Waters Bulletin}, 2, 83–102. \emph{doi:10.1285/i1825229Xv1n2p83}
+#'   \item Ricardo de Freitas, T., Bacalhau, E. T., & Disaró, S. T. (2021). Biovolume method for foraminiferal biomass assessment: evaluation of geometric models and incorporation of species mean cell occupancy. \emph{J. Foramin. Res.} 51, 249–266. \emph{doi: 10.2113/gsjfr.51.4.249}
+
 #' }
 #'
 #' @seealso \code{\link{measure}}
@@ -111,29 +113,37 @@ volume.total <- function(data, model, ...) {
              "12v", "13hlsl", "14hl", "15hl", "17fs", "axh")
 
 
-  model <- match.arg(model, MODELS, several.ok = T)
+  model <- match.arg(model, MODELS, several.ok = TRUE)
 
 
-  x <- x %>%
-    dplyr::rowwise(.) %>%
-    dplyr::mutate(vol = ifelse(model == "1hl", sphere(d_one),
-                               ifelse(model == "2sl", half_sphere(d_one),
-                                      ifelse(model == "3hl", spheroid(h, d_one),
-                                             ifelse(model == "4hl" || model == "5hl", cone(h, d_one),
-                                                    ifelse(model == "6fs", paraboloid(h, d_one),
-                                                           ifelse(model == "7fs",dome(h, d_one),
-                                                                  ifelse(model == "8hl", cylinder(h, d_one),
-                                                                         ifelse(model == "10hl", ellipsoid(h, d_one, d_two),
-                                                                                ifelse(model == "11fs" || model == "12v", elliptic_cone(h, d_one, d_two),
-                                                                                       ifelse(model == "13hlsl",gomphonemoid(h, d_one, d_two),
-                                                                                              ifelse(model == "14hl" || model == "15hl", elliptic_prism(h, d_one, d_two),
-                                                                                                     ifelse(model == "17fs", dypyramid(h, length, width),
-                                                                                                            ifelse(model == "axh", axh(area, h),.))))))))))))))
+  # model dispatch table: each entry is a function of the row
+  dispatch <- list(
+    "1hl"   = function(r) sphere(r$d_one),
+    "2sl"   = function(r) half_sphere(r$d_one),
+    "3hl"   = function(r) spheroid(r$h, r$d_one),
+    "4hl"   = function(r) cone(r$h, r$d_one),
+    "5hl"   = function(r) cone(r$h, r$d_one),
+    "6fs"   = function(r) paraboloid(r$h, r$d_one),
+    "7fs"   = function(r) dome(r$h, r$d_one),
+    "8hl"   = function(r) cylinder(r$h, r$d_one),
+    "10hl"  = function(r) ellipsoid(r$h, r$d_one, r$d_two),
+    "11fs"  = function(r) elliptic_cone(r$h, r$d_one, r$d_two),
+    "12v"   = function(r) elliptic_cone(r$h, r$d_one, r$d_two),
+    "13hlsl"= function(r) gomphonemoid(r$h, r$d_one, r$d_two),
+    "14hl"  = function(r) elliptic_prism(r$h, r$d_one, r$d_two),
+    "15hl"  = function(r) elliptic_prism(r$h, r$d_one, r$d_two),
+    "17fs"  = function(r) dypyramid(r$h, r$length, r$width),
+    "axh"   = function(r) axh(r$area, r$h)
+  )
 
-  result <- x %>%
-    tibble::as_tibble() %>%
-    dplyr::mutate(vol = vol)
+  vols <- vapply(seq_len(nrow(x)), function(i) {
+                   m <- if (length(model) == 1) model else model[i]
+                   if (!m %in% names(dispatch)) stop("Unknown model: ", m)
+                   dispatch[[m]](x[i, ])
+                 }, numeric(1))
 
+  result <- tibble::as_tibble(x) |>
+    dplyr::mutate(vol = vols)
 
 
   return(result)

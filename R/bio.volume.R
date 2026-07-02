@@ -1,11 +1,11 @@
-#' Biovolume calculus
+#' Biovolume calculation
 #'
 #' @description
-#' This function calculates Foraminifera biovolume, through geometric approximation.
+#' This function calculates foraminifera biovolume based on geometric approximation.
 #' To compute others organisms cell volume use \code{\link{volume.total}} function
 #'
 #' @param data a numeric vector or data frame with size data.
-#' Size data parameters by model see \code{\link{volume}} details.
+#' Size data parameters by model see \code{\link{volume.total}} details.
 #' @param genus (optional) character informing foraminifera genus to calculate individual biovolume.
 #' See all genera available in \code{\link{data_pco}}
 #' @param pco (optional) vector informing percent of cell occupancy in the test.
@@ -18,8 +18,7 @@
 #' @details
 #' The function calculates the biovolume of different individuals from the available genera.
 #'
-#' @author
-#' Thaise R. Freitas \email{thaisericardo.freitas@@gmail.com}
+#' @author Thaise Ricardo de Freitas \email{thaisericardo.freitas@@gmail.com}
 #'
 #' @seealso \code{\link{volume.total}}
 #' @seealso \code{\link{biomass}}
@@ -39,7 +38,7 @@
 #'
 #' @export
 
-bio.volume <- function(data, pco = 0.76, genus = NULL, model = NULL){
+bio.volume <- function(data, pco = NULL, genus = NULL, model = NULL){
 
   x <- data.frame(data)
 
@@ -48,57 +47,44 @@ bio.volume <- function(data, pco = 0.76, genus = NULL, model = NULL){
     genus <- x$genus
   }
 
-  if ("model" %in% colnames(x) && missing(genus)) {
+  if ("model" %in% colnames(x) && is.null(genus)) {
     model <- x$model
   }
 
-  if (missing(genus) && missing(model)) {
+  if (is.null(genus) && is.null(model)) {
     stop("Please inform genus or model to be applied.")
-
   }
 
-  if (missing(model) && !missing(genus)){
+  d_pco <- forImage::data_pco
 
-    d_pco <- forImage::data_pco
-
-    if (any(genus == d_pco)) {
-
-      x$model <- (d_pco[match(genus, d_pco$genera), ]$model)
+  # Resolve model from genus lookup
+  if (is.null(model) && !is.null(genus)) {
+    if (any(genus == d_pco$genera)) {
+      x$model <- d_pco[match(genus, d_pco$genera), ]$model
     }
-
   }
 
-
-  if ("pco" %in% colnames(x) && !missing(genus)) {
+  # Resolve pco: column in data takes priority, then genus lookup, then default = 0.76
+  if ("pco" %in% colnames(x)) {
     pco <- x$pco
-
-  }
-
-  if ("pco" %in% colnames(x) && missing(genus)) {
-    pco <- x$pco
-
-  }
-
-  if (!("pco" %in% colnames(x)) && !missing(genus)) {
-
-    d_pco <- forImage::data_pco
-
-    if (any(genus == d_pco)) {
-
-      pco <- (d_pco[match(genus, d_pco$genera), ]$mean)/100
-
-    }
+  } else if (!is.null(genus) && any(genus == d_pco$genera)) {
+    pco <- d_pco[match(genus, d_pco$genera), ]$mean / 100
+  } else if (is.null(pco)) {
+    pco <- 0.76
   }
 
 
 
   v <- forImage::volume.total(x, model = model)$vol
+
   bv <- v * pco
-  result <- x %>%
-    tibble::as_tibble(.) %>%
-    dplyr::rowwise(.) %>%
+
+
+  result <- x |>
+    tibble::as_tibble() |>
+    dplyr::rowwise() |>
     tibble::add_column(vol = v, biovol = bv)
-  result
+
 
   return(result)
 }

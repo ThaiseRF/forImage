@@ -5,25 +5,28 @@
 #' See details \sQuote{Details}:
 #'
 #' @usage biomass(biovolume, method = "michaels")
-#' @param biovolume numeric value, object or data.frame with cell living volume values.
-#' @param method The methods of conversion from biovolume to biomass are listed below, default is \code{'michaels'}:
+#' @param biovolume numeric value, object or data.frame with cell living volume values in micrometers (µm³), as returned by \code{\link{bio.volume}}.
+#' @param method The conversion method from biovolume to biomass. Default is \code{'michaels'}. Available options:
 #' \itemize{
-#'   \item \code{'saidova'} : adopted cell density of 1.027 g/cm3;
-#'   \item \code{'strathmann'} : measured cell density of 0.110 pgC[org]/um3;
-#'   \item \code{'turley'} : estimated cell density of 0.132 pgC[org]/um3;
-#'   \item \code{'putt'} : estimated cell density of 0.140 pgC[org]/um3;
-#'   \item \code{'gerlach'} : adopted cell density of 1.13 g/cm3 wet mass, assuming 10 percent as living organic carbon;
-#'   \item \code{'michaels'} : calculated cell density of 0.089 pgC[org]/um3.
+#'   \item \code{'saidova'} : wet mass density of 1.027 g/cm³;
+#'   \item \code{'strathmann'} : carbon:volume ratio of 0.110 pgC[org]/µm³;
+#'   \item \code{'turley'} : carbon:volume ratio of 0.132 pgC[org]/µm³;
+#'   \item \code{'putt'} : carbon:volume ratio of 0.140 pgC[org]/µm³;
+#'   \item \code{'gerlach'} : wet mass of 1.13 g/cm³ ;
+#'   \item \code{'michaels'} : carbon:volume ratio of 0.089 pgC[org]/µm³.
 #'
 #'
 #' }
 #' @details For biomass estimates based on biovolume is usual the application of a cell density value, to retrieve the amount of organic carbon in the organism.
 #' The function made available distinct options of conversion factor which are based in several authors.
-#' These factors have been applied to a wide diversity of nano, micro, and macro-organisms, some applied to foraminifera and other nearby groups.
+#' These factors have been applied to a wide diversity of nano, micro, and macro-organisms, some applied to foraminifera and other groups.
 #'
-#' @return An `data.frame` or numeric object, consisting of calculated biomass in ugC[org]/ind.
+#' The Saidova and Gerlach factors are originally reported as wet mass densities (g/cm³). The soft body wet mass are converted to organic carbon equivalent by a 10:1 ratio.
 #'
-#' @author Thaise R. Freitas \email{thaisericardo.freitas@@gmail.com}
+#'
+#' @return An added column in a \code{data.frame} or a numeric object, consisting of calculated biomass in µgC[org]/individual.
+#'
+#' @author Thaise Ricardo de Freitas \email{thaisericardo.freitas@@gmail.com}
 #' @references
 #' \itemize{
 #'   \item Saidova, K. (1966). The biomass and quantitative distribution of live foraminifera in the Kurile-Kamchatka trench area. \emph{DOKLADY AKAD. NAUK SSSR}, 174(1), 216–217.
@@ -59,61 +62,36 @@ biomass <- function(biovolume, method = "michaels"){
     method <- "michaels"
   }
 
-  if (method == "saidova" | method == "Saidova") {
+  # All factors are in pgC[org]/µm³.
+  # Saidova: 1.027 g/cm³ wet mass × 10% OC = 0.1027 g OC/cm³
+  #          1 g/cm³ = 1 pgC/µm³, so 0.1027 g/cm³ = 0.1027 pgC/µm³
+  # Gerlach: 1.13 g/cm³ wet mass × 10% OC = 0.113 pgC/µm³
+  # All others are measured or estimated carbon densities already in pgC/µm³.
 
-    b <- x$biovol * 0.1027
+  factors <- c(
+    saidova    = 0.1027,
+    strathmann = 0.110,
+    gerlach    = 0.113,
+    turley     = 0.132,
+    putt       = 0.140,
+    michaels   = 0.089
+  )
 
-    result <- x %>%
-      tibble::as_tibble() %>%
-      dplyr::mutate(biomass = b/1.0e6)
-    result
+  method <- tolower(method)
 
-    } else if (method == "strathmann" | method == "Strathmann") {
+  if (!method %in% names(factors)) {
+    stop(
+      "Unknown method '", method, "'. Choose one of: ",
+      paste(names(factors), collapse = ", "), "."
+    )
+  }
 
-      b <- x$biovol * 0.110
+  # biomass = µm³ × pgC/µm³
+  b <- x$biovol * factors[[method]]
 
-      result <- x %>%
-        tibble::as_tibble() %>%
-        dplyr::mutate(biomass = b/1.0e6)
-      result
-
-    } else if (method == "gerlach" | method == "Gerlach") {
-
-      b <- x$biovol * 0.113
-
-      result <- x %>%
-        tibble::as_tibble() %>%
-        dplyr::mutate(biomass = b/1.0e6)
-      result
-
-    } else if (method == "turley" | method == "Turley") {
-
-      b <- x$biovol * 0.132
-
-      result <- x %>%
-        tibble::as_tibble() %>%
-        dplyr::mutate(biomass = b/1.0e6)
-      result
-
-    } else if (method == "putt" | method == "Putt") {
-
-      b <- x$biovol * 0.140
-
-      result <- x %>%
-        tibble::as_tibble() %>%
-        dplyr::mutate(biomass = b/1.0e6)
-      result
-
-    } else if (method == "michaels" | method == "Michaels") {
-
-      b <- x$biovol * 0.089
-
-      result <- x %>%
-        tibble::as_tibble() %>%
-        dplyr::mutate(biomass = b/1.0e6)
-      result
-
-    }
+  result <- x |>
+    tibble::as_tibble() |>
+    dplyr::mutate(biomass = b / 1e6) #pgC ÷ 1e6 = µgC
 
   return(result)
 
